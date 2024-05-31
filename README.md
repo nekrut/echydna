@@ -40,12 +40,8 @@ reverse-complemented.
     bigApple  = EchyDna(flankLen)
     bigOrange = EchyDna(flankLen)
     for (apple,orange) in zip(apples,oranges):
-        print("=====")
-        print(apple,orange)
-        print(type(apple),type(orange))
         bigApple  += apple  + EchyDna(flankLen)
         bigOrange += orange + EchyDna(flankLen)
-        print(bigApple,bigOrange)
 
     bigApple.fasta ("apple.fa" ,name="APPLE" ,wrap=100)
     bigOrange.fasta("orange.fa",name="ORANGE",wrap=100)
