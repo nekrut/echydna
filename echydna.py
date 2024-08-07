@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from math   import log,floor
-from random import Random,random as unit_random,choice,shuffle
+from random import Random,random as unit_random,choice,shuffle,sample as random_sample
 
 
 # EchyDna--
@@ -53,7 +53,7 @@ class EchyDna(object):
 		else:
 			raise ValueError("first argument is neither a string nor valid length")
 
-		(_,chooser,_) = resolve_prng(seed)
+		(_,chooser,_,_) = resolve_prng(seed)
 
 		if (length <= 0):
 			self.seq = ""
@@ -276,7 +276,7 @@ class EchyDna(object):
 			return EchyDna(self.seq.replace(old,new))
 
 	def shuffle(self,seed=None):
-		(prng,_,_) = resolve_prng(seed)
+		(prng,_,_,_) = resolve_prng(seed)
 		seq = list(self.seq)
 		if (prng == None): shuffle(seq)
 		else:              prng.shuffle(seq)
@@ -301,6 +301,9 @@ class EchyDna(object):
 		background: letters to choose from; multiplicities are OK;
 		seed:       same as for __init__
 		"""
+
+		# TODO: incorporate substitute() into this function, to be performed
+		#       before any of the other mutations
 
 		# allow the caller to pass indel information as a pair in either
 		# indel argument
@@ -368,7 +371,7 @@ class EchyDna(object):
 
 		# perform mutation
 
-		(_,chooser,spinner) = resolve_prng(seed)
+		(_,chooser,spinner,_) = resolve_prng(seed)
 
 		seq = []
 		ix = 0
@@ -415,6 +418,47 @@ class EchyDna(object):
 
 		return EchyDna("".join(seq))
 
+	def substitute(self,numSubs,background=None,seed=None):
+		"""
+		perform a substitution at a specific number of random positions
+		numSubs:    number of bases to change
+		background: letters to choose from; multiplicities are OK;
+		seed:       same as for __init__
+		"""
+
+		# if there are no substitutions to make, just return a copy
+
+		if (numSubs == None) or (numSubs <= 0):
+			return EchyDna(self.seq)
+
+		# clip the number of substitutions to the number of nts in the sequence
+
+		validPositions = [ix for ix in range(len(self.seq)) if (self.seq[ix] in EchyDna.background)]
+		numSubs = min(numSubs,len(validPositions))
+
+		if (numSubs <= 0):
+			return EchyDna(self.seq)
+
+		# build nucleotide substitution tables
+
+		if (background == None): background = EchyDna.background
+
+		ntToSubs = {}
+		for nt in "ACGT":
+			ntToSubs[nt] = [subNt for subNt in background if (subNt != nt)]
+			if (len(ntToSubs[nt]) == 0):
+				raise ValueError("background contains no substitutions for \"%s\"" % nt)
+
+		# perform mutation
+
+		(_,chooser,_,sampler) = resolve_prng(seed)
+
+		seq = list(self.seq)
+		for ix in sampler(validPositions,numSubs):
+			seq[ix] = chooser(ntToSubs[nt])
+
+		return EchyDna("".join(seq))
+
 	def differences(self,other,symbols="-x"):
 		"""a.differences(b) shows the positions where a and b differ"""
 		if (not isinstance(other,EchyDna)) and (not isinstance(other,str)):
@@ -425,7 +469,8 @@ class EchyDna(object):
 		if (not isinstance(symbols,str)) or (len(symbols) != 2):
 			raise ValueError("symbols argument is not a valid string")
 		diff = lambda a,b: symbols[0] if (a==b) else symbols[1]
-		return "".join(map(diff,zip(self.seq,other)))
+		return "".join(map(diff,self.seq,other))
+
 
 # geometric_indel--
 #	geometric_indel(p) can be used the indels argument for EchyDna.mutate()
@@ -437,6 +482,7 @@ def geometric_indel(pExtend):
 def geometric_distribution(pExtend,u):
 	return int(floor(1+log(1-u)/log(pExtend)))
 
+
 # resolve_prng--
 #	Figure out which prng to use, as per the needs of EchyDna.__init__
 
@@ -447,15 +493,19 @@ def resolve_prng(seed=None):
 		prng = seed
 		chooser = prng.choice
 		spinner = prng.random
+		sampler = prng.random_sample
 	elif (seed != None):
 		prng = Random()
 		prng.seed(seed)
 		chooser = prng.choice
 		spinner = prng.random
+		sampler = prng.random_sample
 	else:
 		chooser = choice
 		spinner = unit_random
-	return (prng,chooser,spinner)
+		sampler = random_sample
+	return (prng,chooser,spinner,sampler)
+
 
 # reverse_complement--
 
